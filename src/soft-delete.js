@@ -105,9 +105,9 @@ exports.default = function (Model, _ref) {
     var callback = cb === undefined && typeof options === 'function' ? options : cb;
 
     return this.updateAttributes((0, _extends7.default)({}, scrubbed, (_extends5 = {}, (0, _defineProperty3.default)(_extends5, deletedAt, new Date()), (0, _defineProperty3.default)(_extends5, _isDeleted, true), _extends5))).then(function (result) {
-      return typeof cb === 'function' ? callback(null, result) : result;
+      return typeof callback === 'function' ? callback(null, result) : result;
     }).catch(function (error) {
-      return typeof cb === 'function' ? callback(error) : _promise2.default.reject(error);
+      return typeof callback === 'function' ? callback(error) : _promise2.default.reject(error);
     });
   };
 
