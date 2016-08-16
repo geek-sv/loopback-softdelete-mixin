@@ -81,33 +81,83 @@ exports.default = function (Model, _ref) {
   Model.deleteAll = Model.destroyAll;
 
   Model.destroyById = function softDestroyById(id, cb, optionalCb) {
-    var _extends4;
-    if (arguments.length === 2) {
-      return Model.updateAll({ id: id }, (0, _extends7.default)({}, scrubbed, (_extends4 = {}, (0, _defineProperty3.default)(_extends4, deletedAt, new Date()), (0, _defineProperty3.default)(_extends4, _isDeleted, true), _extends4))).then(function (result) {
-        return typeof cb === 'function' ? cb(null, result) : result;
-      }).catch(function (error) {
-        return typeof cb === 'function' ? cb(error) : _promise2.default.reject(error);
+    var where = { id: id };
+    var data = { _isDeleted: true, deletedAt: new Date() };
+    var callback = cb === undefined && typeof optionalCb === 'function' ? optionalCb : cb;
+    var isCallback = (typeof callback === 'function');
+    var connector = Model.dataSource.connector;
+    var query = connector.buildUpdate(Model.modelName, where, data);
+    var context = {
+      Model: Model,
+      instance: undefined
+    };
+    var notFoundError = null;
+    // Create Promise for avoid break destroy
+    return new _promise2.default(function (resolve, reject) {
+      Model.findOne({ id: id }, function (err, instance) {
+        if (err) {
+          return (isCallback) ? callback(err) : _promise2.reject(err);
+        }
+        // Instance not found
+        if (!instance) {
+          return (isCallback) ? callback(null, null) : null;
+        }
+
+        context.instance = instance;
+
+        Model.notifyObserversOf('before delete', context, function (err) {
+          if (err) {
+            return (isCallback) ? callback(err) : _promise2.reject(err);
+          }
+          connector.query(query.sql, query.params, function (err, result) {
+            if (err) {
+              return (isCallback) ? callback(err) : _promise2.reject(err);
+            }
+            Model.notifyObserversOf('after delete', context, function (err) {
+              if (err) {
+                return (isCallback) ? callback(err) : _promise2.reject(err);
+              }
+              return (isCallback) ? callback(null, result) : result;
+            });
+          });
+        });
       });
-    } else if (arguments.length === 3) {
-      return Model.updateAll({ id: id }, (0, _extends7.default)({}, scrubbed, (_extends4 = {}, (0, _defineProperty3.default)(_extends4, deletedAt, new Date()), (0, _defineProperty3.default)(_extends4, _isDeleted, true), _extends4)), cb).then(function (result) {
-        return typeof optionalCb === 'function' ? optionalCb(null, result) : result;
-      }).catch(function (error) {
-        return typeof optionalCb === 'function' ? optionalCb(error) : _promise2.default.reject(error);
-      });
-    }
+    });
   };
 
   Model.removeById = Model.destroyById;
   Model.deleteById = Model.destroyById;
 
   Model.prototype.destroy = function softDestroy(options, cb) {
-    var _extends5;
+    var where = { id: this.id };
+    var data = { _isDeleted: true, deletedAt: new Date() };
     var callback = cb === undefined && typeof options === 'function' ? options : cb;
-
-    return this.updateAttributes((0, _extends7.default)({}, scrubbed, (_extends5 = {}, (0, _defineProperty3.default)(_extends5, deletedAt, new Date()), (0, _defineProperty3.default)(_extends5, _isDeleted, true), _extends5))).then(function (result) {
-      return typeof callback === 'function' ? callback(null, result) : result;
-    }).catch(function (error) {
-      return typeof callback === 'function' ? callback(error) : _promise2.default.reject(error);
+    var isCallback = (typeof callback === 'function');
+    var connector = Model.dataSource.connector;
+    var query = connector.buildUpdate(Model.modelName, where, data);
+    var context = {
+      Model: Model,
+      instance: this,
+      options: options
+    };
+    // Create Promise for avoid break destroy
+    return new _promise2.default(function (resolve, reject) {
+      Model.notifyObserversOf('before delete', context, function (err) {
+        if (err) {
+          return (isCallback) ? callback(err) : _promise2.reject(err);
+        }
+        connector.query(query.sql, query.params, function (err, result) {
+          if (err) {
+            return (isCallback) ? callback(err) : _promise2.reject(err);
+          }
+          Model.notifyObserversOf('after delete', context, function (err) {
+            if (err) {
+              return (isCallback) ? callback(err) : _promise2.reject(err);
+            }
+            return (isCallback) ? callback(null, result) : result;
+          });
+        });
+      });
     });
   };
 
@@ -141,7 +191,7 @@ exports.default = function (Model, _ref) {
   var _find = Model.find;
   Model.find = function findDeleted() {
     var query = arguments.length <= 0 || arguments[0] === undefined ? {} : arguments[0];
-    
+
     if (!query.deleted) {
       if (!query.where) {
         query.where = queryNonDeleted;
